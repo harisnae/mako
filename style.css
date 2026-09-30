@@ -1,0 +1,140 @@
+/* ============================================================================
+   APEX — an endless shark hunt  (style.css — the APPEARANCE layer)
+   ----------------------------------------------------------------------------
+   All visual styling. No layout logic lives here — index.html provides the
+   structure, game.js toggles the classes this file reacts to:
+     body.playing  -> added on run start, removed on game over (reveals HUD)
+     .show         -> added/removed to fade overlays in and out
+     .hidden       -> display:none utility, toggled by JS (icons, badge)
+   ============================================================================ */
+
+/* ---------- design tokens ----------
+   The entire palette in one place. Change these to re-skin the game:
+   --ink   : primary text (near-white)      --coral: accent (buttons, danger)
+   --dim   : secondary text (muted teal)    --gold : reward/score highlights
+   --bg    : page background behind the canvas */
+:root{
+  --ink:#ecf5f4; --dim:#8fb3b8; --coral:#ff6f59; --gold:#ffc46b; --bg:#03141b;
+}
+
+/* ---------- global reset & base ---------- */
+*{margin:0;padding:0;box-sizing:border-box}
+/* Full-height page with NO scrolling — the game owns the whole viewport. */
+html,body{height:100%;overflow:hidden}
+/* Base look + input lockdown:
+   user-select:none / touch-action:none  -> no accidental text selection or
+   scroll/zoom gestures during play; tap-highlight-color removes the grey
+   flash Android shows on taps. */
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Space Mono',ui-monospace,monospace;
+  -webkit-user-select:none;user-select:none; touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+}
+/* The game surface: pinned over the whole viewport. game.js sizes its
+   pixel buffer (incl. devicePixelRatio) and paints every frame onto it. */
+canvas{position:fixed;inset:0;display:block}
+/* Utility class toggled by JS (mute icons, "NEW BEST" badge). */
+.hidden{display:none!important}
+
+/* ---------- HUD ----------
+   A transparent layer floating ABOVE the canvas (z-index 5, below the
+   overlays' 10). pointer-events:none lets every click/tap fall through it
+   to the game's global input handler. */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+/* Depth meter (top-left). Starts invisible; fades in while playing. */
+#depth{position:absolute;top:20px;left:22px;font-size:11px;letter-spacing:.22em;color:var(--dim);opacity:0;transition:opacity .4s}
+/* Score block (top-centre). translateX(-50%) centres it on the midpoint. */
+#scoreWrap{position:absolute;top:12px;left:50%;transform:translateX(-50%);text-align:center;opacity:0;transition:opacity .4s}
+/* game.js adds/removes body.playing on start / game over — this is what
+   fades the HUD readouts in and out. */
+body.playing #depth,body.playing #scoreWrap{opacity:1}
+/* The big fish counter. Bungee display font + a hard 3px dark shadow
+   (offset, not blurred) keeps it readable over the moving water. */
+#score{font-family:'Bungee',cursive;font-size:46px;line-height:1;text-shadow:0 3px 0 rgba(1,10,14,.45)}
+/* Tiny caption under the number. */
+#scoreLabel{font-size:9px;letter-spacing:.34em;color:var(--dim);margin-top:3px}
+/* Sound toggle (top-right). The ONE element in #hud that re-enables
+   pointer-events:auto, so it is actually clickable while the rest of the
+   HUD lets taps pass through to the game. */
+#muteBtn{
+  position:absolute;top:16px;right:18px;pointer-events:auto;width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(3,18,24,.5);border:1px solid rgba(143,179,184,.25);border-radius:8px;
+  color:var(--dim);cursor:pointer;transition:color .2s,border-color .2s;
+}
+/* Hover brightens the icon + border (the SVGs use currentColor, so they
+   recolour automatically with the button's text colour). */
+#muteBtn:hover{color:var(--ink);border-color:rgba(143,179,184,.6)}
+#muteBtn svg{width:20px;height:20px}
+
+/* ---------- overlays ----------
+   Full-screen screens (menu / game-over / paused) sitting above everything
+   (z-index 10). Hidden by default: opacity 0 + pointer-events:none, so
+   they can't block input until game.js adds .show. The dimmed, blurred
+   backdrop keeps the live ocean visible behind the text. */
+.overlay{
+  position:fixed;inset:0;z-index:10;display:flex;overflow-y:auto;touch-action:pan-y;
+  background:rgba(2,9,13,.55);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+  opacity:0;pointer-events:none;transition:opacity .35s ease;
+}
+/* The visible state — game.js toggles this class to swap screens. */
+.overlay.show{opacity:1;pointer-events:auto}
+/* Centred content column shared by all three screens. */
+.panel{max-width:470px;padding:24px;text-align:center;margin:auto}
+/* Small letter-spaced label above each title. */
+.kicker{font-size:10px;letter-spacing:.42em;color:var(--coral);margin-bottom:14px}
+/* Display titles: Bungee, scaling with the viewport (56-84px). */
+h1{font-family:'Bungee',cursive;font-size:clamp(56px,12vw,84px);line-height:.95;letter-spacing:.01em}
+/* The coral full stop after "APEX". */
+h1 .dot{color:var(--coral)}
+/* The pause screen's title is smaller than the main title. */
+#paused h1{font-size:44px}
+/* Tagline / helper text under titles. */
+.tag{color:var(--dim);font-size:13px;line-height:1.6;margin:14px 0 26px}
+/* How-to-play legend: a left-aligned grid inside the centred panel;
+   each row = one icon + one rule. */
+.legend{list-style:none;text-align:left;margin:0 auto 28px;max-width:340px;display:grid;gap:12px}
+.legend li{display:flex;align-items:center;gap:14px;font-size:12.5px;line-height:1.45;color:var(--dim)}
+.legend svg{flex:0 0 auto;width:26px;height:26px}
+/* Keyword colour-coding: "Eat" gold, "Avoid" coral — matching the
+   in-game sprites so players learn the visual language before diving. */
+.legend b{color:var(--ink);font-weight:700}
+.legend b.eat{color:var(--gold)}
+.legend b.avoid{color:var(--coral)}
+/* The chunky action buttons (DIVE IN / HUNT AGAIN). The hard 5px offset
+   shadow (no blur) gives a tactile, pressable game feel. */
+.btn{
+  font-family:'Bungee',cursive;font-size:17px;letter-spacing:.06em;color:#0d2129;
+  background:var(--coral);border:none;padding:15px 38px;cursor:pointer;border-radius:4px;
+  box-shadow:0 5px 0 #b34a3c;transition:transform .08s,box-shadow .08s,filter .15s;
+}
+.btn:hover{filter:brightness(1.07)}
+/* Pressed state: button sinks INTO its shadow (moves down, shadow shrinks). */
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 #b34a3c}
+/* Keyboard accessibility: visible outline for tab/keyboard users only. */
+.btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+/* Best-score line under the buttons. */
+.best{margin-top:22px;font-size:11px;letter-spacing:.28em;color:var(--dim)}
+/* Game-over: cause of death line ("YOU SWAM INTO A NAVAL MINE" etc.). */
+.cause{color:var(--coral);font-size:12px;letter-spacing:.14em;margin:10px 0 6px}
+/* The giant final score, in coral with a hard shadow. */
+.finalScore{font-family:'Bungee',cursive;font-size:clamp(64px,14vw,96px);color:var(--coral);line-height:1;text-shadow:0 4px 0 rgba(1,10,14,.45)}
+.finalLabel{font-size:10px;letter-spacing:.4em;color:var(--dim);margin:6px 0 18px}
+/* "NEW BEST" pill — outlined, not filled; game.js toggles .hidden on it. */
+.badge{display:inline-block;border:1px solid var(--gold);color:var(--gold);font-size:10px;letter-spacing:.3em;padding:6px 14px;border-radius:999px;margin-bottom:16px}
+/* Small "or click anywhere / press Space" reminder. */
+.hint{margin-top:14px;font-size:10px;letter-spacing:.2em;color:var(--dim)}
+
+/* ---------- short / landscape screens ---------- */
+@media (max-height:520px){
+  .panel{padding:14px 18px}
+  h1{font-size:40px}
+  #paused h1{font-size:30px}
+  #score{font-size:36px}
+  .tag{margin:8px 0 14px}
+  .legend{margin-bottom:14px;gap:8px}
+  .btn{padding:10px 26px}
+  .best{margin-top:12px}
+  .finalScore{font-size:56px}
+}

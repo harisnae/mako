@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  MAKO — an endless shark hunt  (index.html — the STRUCTURE layer)
+  ----------------------------------------------------------------------------
+  This file contains no game logic and no styling. It provides:
+    1. Document metadata (encoding, viewport, fonts, favicon, stylesheet).
+    2. The single <canvas> that game.js paints the entire world onto.
+    3. The DOM HUD (depth meter, score, mute button).
+    4. Three full-screen overlay screens: menu, game-over, paused.
+  Behaviour  -> game.js   |  Appearance -> style.css
+  ============================================================================
+-->
+<html lang="en">
+<head>
+<!-- Character encoding: UTF-8, so the em-dashes (—) and middle dots (·)
+     used throughout the UI text render correctly. Must come first. -->
+<meta charset="UTF-8">
+
+<!-- Mobile viewport settings:
+       width=device-width -> layout matches the device's CSS pixel width
+       initial-scale=1    -> start unzoomed
+       user-scalable=no   -> disables pinch-zoom; the game depends on fast,
+                             precise taps and accidental zoom would break it -->
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+<!-- Tints the mobile browser's address/status bar to match the deep-sea
+     background colour declared in style.css (--bg: #03141b). Cosmetic only. -->
+<meta name="theme-color" content="#03141b">
+
+<!-- Text shown on the browser tab and in bookmarks. -->
+<title>MAKO — an endless shark hunt</title>
+
+<!-- Favicon embedded as a DATA URI — a tiny inline SVG (shark fin on a dark
+     rounded square), so no extra image file is needed in the repo.
+     IMPORTANT: inside a data URI, '#' must be written as '%23' — that is why
+     the fill colours read '%2306202b' / '%238fa3ad'. Do not "fix" them. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2306202b'/><path d='M8 24c2-10 8-16 16-18-3 6-3 12-2 18z' fill='%238fa3ad'/></svg>">
+
+<!-- Performance hints: open the DNS/TLS connection to the Google Fonts
+     servers early so the font files requested below start loading sooner.
+     Pure optimisation — no visual effect of their own. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<!-- The two game fonts:
+       Bungee     -> chunky display font (title, score numbers, buttons)
+       Space Mono -> monospace font (labels, small UI text)
+     Font fallbacks are declared in style.css in case loading fails. -->
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- The game's stylesheet (split out of this file). Styles the canvas,
+     HUD, overlays, buttons and legend. -->
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ================= GAME WORLD =================
+     The one <canvas> the whole game is rendered on. game.js grabs it with
+     getContext('2d') and repaints it every frame: water gradient, light
+     rays, dunes, kelp, sand, mines, jellyfish, fish, the shark, particles
+     and score pop-ups. CSS pins it over the viewport (position:fixed;
+     inset:0); game.js's resize() keeps its pixel size matched to the
+     window (including devicePixelRatio for sharp rendering). -->
+<canvas id="sea"></canvas>
+
+<!-- ================= HUD (heads-up display) =================
+     A transparent layer floating ABOVE the canvas (z-index: 5).
+     It has pointer-events:none in CSS, so clicks/taps pass straight
+     through it to the page — the game's global input handler still
+     receives them. Its children are faded out (opacity:0) until the
+     'playing' class is set on <body> by game.js (added on start,
+     removed on game over). -->
+<div id="hud">
+
+  <!-- Depth meter (top-left). Flavour text only: game.js rewrites the
+       number as the shark travels (runDist / 50 = metres). -->
+  <div id="depth">DEPTH 0 M</div>
+
+  <!-- Score block (top-centre). -->
+  <div id="scoreWrap">
+    <!-- The big fish counter. game.js sets its textContent each time a
+         fish is eaten and fires a quick scale "pop" animation on it. -->
+    <div id="score">0</div>
+    <!-- Tiny caption under the number. -->
+    <div id="scoreLabel">FISH EATEN</div>
+  </div>
+
+  <!-- Sound toggle (top-right). Unlike the rest of #hud, this button
+       re-enables pointer-events:auto in CSS so it is actually clickable.
+         type="button" -> prevents any default form-submit behaviour
+         aria-label    -> screen-reader label (the button has no text) -->
+  <button id="muteBtn" type="button" aria-label="Toggle sound">
+    <!-- "Sound ON" icon: speaker body + two sound-wave arcs.
+         viewBox="0 0 24 24" = the icon's internal coordinate grid (CSS
+         scales it to 20px). fill="none" on the root means shapes are not
+         filled by default — each path declares its own fill/stroke.
+         "currentColor" makes the icon inherit the button's text colour,
+         so the CSS :hover rule recolours it automatically. -->
+    <svg id="icoOn" viewBox="0 0 24 24" fill="none">
+      <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+      <path d="M16.5 8.5c1.8 1.8 1.8 5.2 0 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M19 6c3 3 3 9 0 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <!-- "Sound OFF" icon: speaker + an X. Starts hidden via the .hidden
+         class (display:none). toggleMute() in game.js swaps which icon is
+         visible and remembers the choice in localStorage ('mako.muted'). -->
+    <svg id="icoOff" class="hidden" viewBox="0 0 24 24" fill="none">
+      <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/>
+      <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </button>
+</div>
+
+<!-- ================= START SCREEN =================
+     Full-screen overlay (z-index: 10, above the HUD). The 'show' class is
+     what makes an overlay visible (opacity:1 + pointer-events:auto in CSS);
+     startGame() in game.js removes it when the run begins. Clicking
+     anywhere on it also starts the game via the global pointerdown
+     handler in game.js. -->
+<div id="menu" class="overlay show">
+  <!-- Centred content column (max-width 470px in CSS). -->
+  <div class="panel">
+    <!-- Small letter-spaced label above the title. -->
+    <div class="kicker">SINGLE-BUTTON ENDLESS HUNT</div>
+    <!-- Game title. The <span class="dot"> is the coral-coloured full
+         stop, styled by CSS (h1 .dot { color: var(--coral) }). -->
+    <h1>MAKO<span class="dot">.</span></h1>
+    <!-- Tagline under the title. -->
+    <p class="tag">You are the shark. The ocean is yours — what's left of it.</p>
+
+    <!-- How-to-play legend: one inline SVG icon + one rule per row.
+         The icons are hand-drawn to MATCH the in-game sprites' colours,
+         so players learn the game's visual language before diving in. -->
+    <ul class="legend">
+      <!-- Row 1: gold fish icon — same palette as the canvas-drawn fish
+           (#ffc46b body, #e8a54b tail, #1d252b eye). -->
+      <li>
+        <svg viewBox="0 0 24 24"><path fill="#ffc46b" d="M21 12c-2.5 3.8-6 5.5-9.5 5.5C8 17.5 5 15.5 3 12c2-3.5 5-5.5 8.5-5.5S18.5 8.2 21 12z"/><path fill="#e8a54b" d="M4.5 12L1 8.5v7z"/><circle cx="16.5" cy="11" r="1.3" fill="#1d252b"/></svg>
+        <span><b class="eat">Eat</b> fish schools — each one scores</span>
+      </li>
+      <!-- Row 2: mine icon — grey spikes, dark body, red light, matching
+           the in-game mine. &amp; is the escaped ampersand. -->
+      <li>
+        <svg viewBox="0 0 24 24"><g stroke="#8fa3ad" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></g><circle cx="12" cy="12" r="6" fill="#39434c"/><circle cx="12" cy="12" r="2" fill="#ff4b4b"/></svg>
+        <span><b class="avoid">Avoid</b> mines &amp; jellyfish — one touch ends the run</span>
+      </li>
+      <!-- Row 3: double upward chevron = the "kick upward" control hint. -->
+      <li>
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 14l7-7 7 7M5 20l7-7 7 7" stroke="#ff6f59" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span><b>Click, tap or Space</b> to kick upward</span>
+      </li>
+    </ul>
+
+    <!-- Start button. Its click handler in game.js calls press(), which
+         starts the run AND performs the first upward kick. -->
+    <button id="startBtn" class="btn" type="button">DIVE IN</button>
+    <!-- Best-score line. game.js fills this from localStorage
+         ('mako.best') on load; shows the "no record" message if empty. -->
+    <div class="best" id="menuBest">FIRST DIVE — NO RECORD YET</div>
+  </div>
+</div>
+
+<!-- ================= GAME-OVER SCREEN =================
+     Same overlay mechanism as the menu, but without 'show' — it stays
+     invisible until gameOver() in game.js fills in the results and adds
+     the class. A 450 ms input lockout in game.js prevents accidental
+     instant restarts from the same key-mash that killed you. -->
+<div id="over" class="overlay">
+  <div class="panel">
+    <div class="kicker">THE HUNT ENDS</div>
+    <!-- Cause of death, written by game.js: either
+         "YOU SWAM INTO A NAVAL MINE" or "STUNG BY A BOX JELLYFISH". -->
+    <div class="cause" id="cause"></div>
+    <!-- Final fish count, injected by game.js. -->
+    <div class="finalScore" id="finalScore">0</div>
+    <div class="finalLabel">FISH EATEN</div>
+    <!-- "NEW BEST" pill. Hidden by default; game.js toggles the 'hidden'
+         class only when the run beat the stored record. -->
+    <div><span id="newBest" class="badge hidden">NEW BEST</span></div>
+    <!-- Restart button (routes through the same press() as start). -->
+    <button id="retryBtn" class="btn" type="button">HUNT AGAIN</button>
+    <!-- Updated best score, written by game.js after the run ends. -->
+    <div class="best" id="overBest">BEST · 0 FISH</div>
+    <!-- Reminder that clicking anywhere / pressing Space also restarts. -->
+    <div class="hint">or click anywhere / press Space</div>
+  </div>
+</div>
+
+<!-- ================= PAUSE SCREEN =================
+     Shown by togglePause() in game.js — when the player presses P, or
+     automatically when the tab loses visibility (visibilitychange).
+     While visible, the main loop early-returns and freezes the
+     simulation; any click or key press resumes play. -->
+<div id="paused" class="overlay">
+  <div class="panel">
+    <h1>PAUSED</h1>
+    <p class="tag">click anywhere or press P to resume</p>
+  </div>
+</div>
+
+<!-- ================= GAME LOGIC =================
+     The entire simulation lives in game.js: state machine, shark physics,
+     spawning, collisions, canvas rendering and synthesized audio.
+     It is loaded LAST, at the end of <body>, so every element above
+     already exists in the DOM when the script runs — that is why no
+     'defer' attribute is needed. -->
+<script src="game.js"></script>
+</body>
+</html>
